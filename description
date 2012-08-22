@@ -1,0 +1,23 @@
+Name: Paco
+Title: Paco: Parameterized Coinduction
+Url: http://plv.mpi-sws.org/paco/
+Description: Paco is a Coq library implementing parameterized coinduction. Parameterized coinduction is a technique for defining coinductive predicates (i.e., in Prop), using which one can perform coinductive proofs in a more compositional and incremental fashion than with standard Tarski-style constructions. 
+
+The Paco library provides a tactic called "pcofix", replacing Coq's primitive cofix and avoiding its syntactic guardedness checking of proof terms. We have found that pcofix yields clear performance and usability benefits, even on simple examples.
+
+Keywords: cofix,coinduction,paco,proof,coinductive
+Category: Mathematics/Logic/Foundations
+Author: Chung-Kil Hur
+Email: gil@mpi-sws.org
+Institution: MPI-SWS
+Author: Georg Neis
+Email: neis@mpi-sws.org
+Institution: MPI-SWS
+Author: Derek Dreyer
+Email: dreyer@mpi-sws.org
+Institution: MPI-SWS
+Author: Viktor Vafeiadis
+Email: viktor@mpi-sws.org
+Institution: MPI-SWS
+Require: 
+License: BSD
