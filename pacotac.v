@@ -375,7 +375,7 @@ Proof. intros; apply X. Defined.
 
 Ltac pcpre6 :=
   generalize _pcfix_mark_cons; repeat intro;
-  apply _pcpre6; intro X;
+  apply _pcpre6; let X := fresh "X" in intro X;
   match goal with
   | |- _ ?e1 ?e2 ?e3 ?e4 ?e5 ?e6 => unfold X; clear X; pcfix_cont6 e1 e2 e3 e4 e5 e6
   end.
@@ -420,7 +420,7 @@ Proof. intros; apply X. Defined.
 
 Ltac pcpre7 :=
   generalize _pcfix_mark_cons; repeat intro;
-  apply _pcpre7; intro X;
+  apply _pcpre7; let X := fresh "X" in intro X;
   match goal with
   | |- _ ?e1 ?e2 ?e3 ?e4 ?e5 ?e6 ?e7 => unfold X; clear X; pcfix_cont7 e1 e2 e3 e4 e5 e6 e7
   end.
@@ -467,7 +467,7 @@ Proof. intros; apply X. Defined.
 
 Ltac pcpre8 :=
   generalize _pcfix_mark_cons; repeat intro;
-  apply _pcpre8; intro X;
+  apply _pcpre8; let X := fresh "X" in intro X;
   match goal with
   | |- _ ?e1 ?e2 ?e3 ?e4 ?e5 ?e6 ?e7 ?e8 => unfold X; clear X; pcfix_cont8 e1 e2 e3 e4 e5 e6 e7 e8
   end.
