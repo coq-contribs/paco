@@ -128,8 +128,8 @@ CoFixpoint map f s : stream :=
     of [seq_gen] is not recursive.
 *)
 
-Inductive seq_gen (rseq  : stream -> stream -> Prop) : stream -> stream -> Prop :=
-  | _seq_gen : forall n s1 s2 (R : rseq s1 s2), seq_gen rseq (cons n s1) (cons n s2).
+Inductive seq_gen seq : stream -> stream -> Prop :=
+  | _seq_gen : forall n s1 s2 (R : seq s1 s2 : Prop), seq_gen seq (cons n s1) (cons n s2).
 Hint Constructors seq_gen.
 
 
@@ -177,20 +177,35 @@ Qed.
     equality and the new proof of the example, and then explain what
     is going on behind the scenes.  In both, we use [paco] constructs
     with suffix "2" because we are dealing with predicates of arity 2
-    here.
-   
+    here. 
+
     _Note_: [Paco] supports predicates of arity up to 8.  Also, it
     supports up to three mutually coinductive predicates (see the last
     example of this tutorial).  In either case, extending this is just
     a matter of copy and paste.
+
+    We also have to prove monotonicity of the generating function
+    [seq_gen], which can be discharged by the tactic [pmonauto], and
+    register it in the Hint databse [paco].
+
+    _Remark_: Unlike [CoInductive], [paco] does not care whether the
+    generating function is given in a _strictly positive_ syntactic
+    form; all that matters is that the function is monotone. More
+    specifically, [paco2 f] is well defined for an arbitrary generating
+    function [f] regardless of whether it is monotone or not. However,
+    in order to ensure that [paco2 f bot2] is the greatest fixed point
+    of [f], we need monotonicity of [f]. 
 *)
 
-Definition seq' := paco2 seq_gen bot2.
+Definition seq' s1 s2 := paco2 seq_gen bot2 s1 s2.
+Hint Unfold seq'.
+Lemma seq_gen_mon: monotone2 seq_gen. Proof. pmonauto. Qed.
+Hint Resolve seq_gen_mon : paco.
 
 Theorem example' : forall n, seq' (enumerate n) (cons n (map S (enumerate n))).
 Proof.
   pcofix CIH.
-  intros; apply paco2_fold.
+  intros; pfold.
   rewrite sunf_eq at 1; simpl.
   constructor.
   rewrite (sunf_eq (enumerate n)); simpl.
@@ -217,10 +232,6 @@ Qed.
     (where [bot2] is the empty relation) is just the ordinary greatest
     fixed point of [f].
 
-    _Remark_: Unlike [CoInductive], [paco] does not care whether the
-    generating function is given in a _strictly positive_ syntactic
-    form; all that matters is that the function is monotone.
-
     Let us look at our example domain to understand better.  A proof
     of [paco2 seq_gen r s1 s2] can be seen as a proof of [r <2= seq ->
     seq s1 s2], where the use of the premise is guarded
@@ -233,17 +244,18 @@ Qed.
     clear why our definition of [seq'] is equivalent to [seq].
 
     To fold and unfold parameterized fixed points, we provide two
-    lemmas:
+    tactics, where [upaco2 f r := paco2 f r \2/ r]:
 
-    - [paco2_fold f : forall r, f (paco2 f r \2/ r) <2= paco2 f r]
-    - [paco2_unfold f : monotone2 f -> forall r, paco2 f r <2= f (paco2 f r \2/ r)]
-
+    - [pfold] : when the conclusion is [paco2 f r] for some [f] and
+      [r], [pfold] converts it to [f (upaco2 f r)]
+    - [punfold H] : when the hypothesis [H] is [paco2 f r] for some
+      [f] and [r], [punfold H] converts it to [f (upaco2 f r)]
 
     Other useful lemmas are:
 
     - [paco2_mon f : monotone2 (paco2 f)]
     - [paco2_mult f : forall r, paco2 f (paco2 f r) <2= paco2 f r]
-    - [paco2_mult_strong f : forall r, paco2 f (paco2 f r \2/ r) <2= paco2 f r]
+    - [paco2_mult_strong f : forall r, paco2 f (upaco2 f r) <2= paco2 f r]
 
 
     We will see an example involving [paco2_mult] in a moment.  But
@@ -296,9 +308,9 @@ Qed.
     which follows directly by applying the coinduction hypothesis [CIH].
 
     In the case of [example'], the proof is slightly different.
-    First, we use [paco2_fold] rather than [seq_fold], simply because
-    we now reason about [seq'] rather than [seq].  After applying
-    [paco2_fold] and unfolding [enumerate n], we have:
+    First, we use the tactic [pfold] rather than [apply seq_fold],
+    simply because we now reason about [seq'] rather than [seq].
+    After applying [pfold] and unfolding [enumerate n], we have:
   
     [r : stream -> stream -> Prop] #<br>#
     [CIH : forall n : nat, r (enumerate n) (cons n (map S (enumerate n)))] #<br>#
@@ -334,17 +346,7 @@ Qed.
 (** *** Another example
 
     Before moving on to the second part, we briefly demonstrate the
-    use of [paco2_unfold] (the only [paco] lemma that actually
-    requires monotonicity of the generating function).
-
-    _Remark_: [paco2 f] is well defined for an arbitrary generating
-    function [f] regardless of whether it is monotone or not. However,
-    in order to ensure that [paco2 f bot2] is the greatest fixed point
-    of [f], we need monotonicity of [f]. But, thanks to the way that
-    the paco construction is defined, we don't actually need to pass
-    around the knowledge that [f] is monotone except in the lemma
-    [paco2_unfold]. This is very convenient because [paco2_unfold] is
-    less commonly used than the other lemmas.
+    use of the tactics [punfold] and [pclearbot].
 *)(* *)
 
 
@@ -356,25 +358,32 @@ Theorem seq_cons : forall n1 n2 s1 s2 (SEQ : seq (cons n1 s1) (cons n2 s2)),
 Proof.
   intros.
   inversion_clear SEQ; rename H into SEQ.
-  inversion_clear SEQ; intuition.
+  inversion_clear SEQ; auto.
 Qed.
 
 
 (** And here is the corresponding proof for [seq'].
+
+  Note that the tactic [pclearbot] simplifies all hypotheses of the form [upaco{n} gf bot{n}] to [paco{n} gf bot{n}].
 *)
-
-Lemma seq_gen_mon : monotone2 seq_gen.
-Proof. repeat intro; destruct IN; auto. Qed.
-
-Definition seq'_unfold := paco2_unfold seq_gen_mon.
 
 Theorem seq'_cons : forall n1 n2 s1 s2 (SEQ : seq' (cons n1 s1) (cons n2 s2)),
   n1 = n2 /\ seq' s1 s2.
 Proof.
   intros. 
-  apply seq'_unfold in SEQ.
-  inversion_clear SEQ; intuition.
+  punfold SEQ.
+  inversion_clear SEQ; pclearbot; auto.
 Qed.
+
+(** We also provide two tactics [pdestruct] and [pinversion].
+    They are simply defined as follows:
+
+    - [pdestruct H] := [punfold H; destruct H; pclearbot]
+    - [pinversion H] := [punfold H; inversion H; pclearbot]
+
+    Using this the proof of the above theorem [seq'_cons] can be 
+    simplified as [intros; pinversion SEQ; auto.]
+*)(* *)
 
 
 
@@ -410,11 +419,11 @@ Qed.
     four trees.
 *)
 
-CoFixpoint one : inftree := node 0 one two
-with       two : inftree := node 1 one two.
+CoFixpoint one : inftree := node 1 one two
+with       two : inftree := node 2 one two.
 
-CoFixpoint eins : inftree := node 0 eins (node 1 eins zwei)
-with       zwei : inftree := node 1 eins zwei.
+CoFixpoint eins : inftree := node 1 eins (node 2 eins zwei)
+with       zwei : inftree := node 2 eins zwei.
 
 
 
@@ -424,9 +433,9 @@ with       zwei : inftree := node 1 eins zwei.
     of its generating function.
 *)
 
-Inductive teq_gen (rteq : inftree -> inftree -> Prop) : inftree -> inftree -> Prop :=
-  | _teq_gen : forall n t1l t1r t2l t2r (Rl : rteq t1l t2l) (Rr : rteq t1r t2r),
-                 teq_gen rteq (node n t1l t1r) (node n t2l t2r).
+Inductive teq_gen teq : inftree -> inftree -> Prop :=
+  | _teq_gen : forall n t1l t1r t2l t2r (Rl : teq t1l t2l : Prop) (Rr : teq t1r t2r),
+                 teq_gen teq (node n t1l t1r) (node n t2l t2r).
 Hint Constructors teq_gen.
 
 CoInductive teq t1 t2 : Prop :=
@@ -483,19 +492,22 @@ Qed.
     [pcofix]-proofs.
 *)
 
-Definition teq' := paco2 teq_gen bot2.
+Definition teq' t1 t2 := paco2 teq_gen bot2 t1 t2.
+Hint Unfold teq'.
+Lemma teq_gen_mon: monotone2 teq_gen. Proof. pmonauto. Qed.
+Hint Resolve teq_gen_mon : paco.
 
 Theorem teq'_one : teq' one eins.
 Proof.
   pcofix CIH.
-  apply paco2_fold.
+  pfold.
   rewrite (tunf_eq one), (tunf_eq eins); simpl.
   constructor; auto.
-  left; apply paco2_fold.
+  left; pfold.
   rewrite (tunf_eq two); simpl.
   constructor; auto.
   left; pcofix CIH'.
-  apply paco2_fold.
+  pfold.
   rewrite (tunf_eq two), (tunf_eq zwei); simpl.
   constructor; auto.
 Qed.
@@ -503,14 +515,14 @@ Qed.
 Theorem teq'_two : teq' two zwei.
 Proof.
   pcofix CIH.
-  apply paco2_fold.
+  pfold.
   rewrite (tunf_eq two), (tunf_eq zwei); simpl.
   constructor; auto.
   left; pcofix CIH'.
-  apply paco2_fold.
+  pfold.
   rewrite (tunf_eq one), (tunf_eq eins); simpl.
   constructor; auto.
-  left; apply paco2_fold.
+  left; pfold.
   rewrite (tunf_eq two); simpl.
   constructor; auto.
 Qed.
@@ -615,10 +627,10 @@ Lemma teq'_two_one : forall r,
   (r two zwei : Prop) -> paco2 teq_gen r one eins.
 Proof.
   intros; pcofix CIH. 
-  apply paco2_fold.
+  pfold.
   rewrite (tunf_eq one), (tunf_eq eins); simpl.
   constructor; auto.
-  left; apply paco2_fold.
+  left; pfold.
   rewrite (tunf_eq two); simpl.
   constructor; auto.
 Qed.
@@ -627,7 +639,7 @@ Lemma teq'_one_two : forall r,
   (r one eins : Prop) -> paco2 teq_gen r two zwei.
 Proof.
   intros; pcofix CIH.
-  apply paco2_fold.
+  pfold.
   rewrite (tunf_eq two), (tunf_eq zwei); simpl.
   constructor; auto.
 Qed.
@@ -635,18 +647,21 @@ Qed.
 
 (** We now compose them with the help of the lemma [paco2_mult]:
     - [paco2_mult f : paco2 f (paco2 f r) <2= paco2 f r]
+
+    The tactic [pmult] applies [paco{n}_mult] to the conclusion 
+    for an appropriate [n].
 *)
 
 Theorem teq'_eins : teq' one eins.
 Proof.
   pcofix CIH.
-  apply paco2_mult, teq'_two_one, teq'_one_two, CIH.
+  pmult; apply teq'_two_one, teq'_one_two, CIH.
 Qed.
 
 Theorem teq'_zwei : teq' two zwei.
 Proof.
   pcofix CIH.
-  apply paco2_mult, teq'_one_two, teq'_two_one, CIH.
+  pmult; apply teq'_one_two, teq'_two_one, CIH.
 Qed.
 
 
@@ -662,13 +677,13 @@ Qed.
     before).
 *)
 
-Inductive eqone_gen (reqone reqtwo : inftree -> Prop) : inftree -> Prop :=
-  | _eqone_gen : forall tl tr (EQL : reqone tl) (EQR : reqtwo tr),
-                    eqone_gen reqone reqtwo (node 0 tl tr).
+Inductive eqone_gen eqone eqtwo : inftree -> Prop :=
+  | _eqone_gen : forall tl tr (EQL : eqone tl : Prop) (EQR : eqtwo tr : Prop),
+                    eqone_gen eqone eqtwo (node 1 tl tr).
 
-Inductive eqtwo_gen (reqone reqtwo : inftree -> Prop) : inftree -> Prop :=
-  | _eqtwo_gen : forall tl tr (EQL : reqone tl) (EQR : reqtwo tr),
-                   eqtwo_gen reqone reqtwo (node 1 tl tr).
+Inductive eqtwo_gen eqone eqtwo : inftree -> Prop :=
+  | _eqtwo_gen : forall tl tr (EQL : eqone tl : Prop) (EQR : eqtwo tr : Prop),
+                   eqtwo_gen eqone eqtwo (node 2 tl tr).
 
 Hint Constructors eqone_gen eqtwo_gen.
 
@@ -703,26 +718,29 @@ Qed.
 (** *** A proof via [pcofix]
 
     To define the [paco] versions of [eqone] and [eqtwo], we apply
-    the two constructors [paco1'a] and [paco1'b], respectively ("1"
+    the two constructors [paco1_2_0] and [paco1_2_1], respectively ("1"
     because we are dealing with unary predicates).  Again, the
     translation of the lemma and of its proof is almost trivial.
 *)
 
-Definition eqone' := paco1'a eqone_gen eqtwo_gen bot1 bot1.
-Definition eqtwo' := paco1'b eqone_gen eqtwo_gen bot1 bot1.
+Definition eqone' t := paco1_2_0 eqone_gen eqtwo_gen bot1 bot1 t.
+Definition eqtwo' t := paco1_2_1 eqone_gen eqtwo_gen bot1 bot1 t.
+Hint Unfold eqone' eqtwo'.
+Lemma eqone_gen_mon: monotone1_2 eqone_gen. Proof. pmonauto. Qed.
+Lemma eqtwo_gen_mon: monotone1_2 eqtwo_gen. Proof. pmonauto. Qed.
+Hint Resolve eqone_gen_mon eqtwo_gen_mon : paco.
 
 Lemma eqone'_eins: eqone' eins.
 Proof.
-  pcofix CIH0; apply paco1'a_fold.
+  pcofix CIH0; pfold.
   rewrite tunf_eq; simpl; constructor. 
     right; apply CIH0.
-  left; pcofix CIH1; apply paco1'b_fold.
+  left; pcofix CIH1; pfold.
   constructor.
     right; apply CIH0.
   right; rewrite tunf_eq; apply CIH1.
 Qed.
 
-
 (** _Remark_: For three mutually coinductive predicates, the
-    constructors are [paco{n}''a], [paco{n}''b], and [paco{n}''c].
+    constructors are [paco{n}_3_0], [paco{n}_3_1], and [paco{n}_3_2].
 *)
